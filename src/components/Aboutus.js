@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronRight, Menu, X } from 'lucide-react';
 import './css/about.css';
+import AuthModal from './AuthModal';
 
 const About = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -34,7 +36,9 @@ const About = () => {
               <a href="/about">About</a>
               <a href="/Services">Services</a>
               <a href="/Contact">Contact</a>
-              <button className="cta-button">Get Started</button>
+              <button className="cta-button" onClick={() => setIsAuthOpen(true)}>
+                Get Started
+              </button>
             </div>
 
             <button 
@@ -54,7 +58,15 @@ const About = () => {
               <a href="/about">About</a>
               <a href="/Services">Services</a>
               <a href="/Contact">Contact</a>
-              <button className="cta-button mobile-cta">Get Started</button>
+              <button 
+                className="cta-button mobile-cta"
+                onClick={() => {
+                  setIsAuthOpen(true);
+                  setIsMenuOpen(false);
+                }}
+              >
+                Get Started
+              </button>
             </div>
           </div>
         )}
@@ -121,6 +133,9 @@ const About = () => {
           </div>
         </div>
       </footer>
+
+      {/* Auth Modal */}
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </div>
   );
 };

@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { Menu, X } from 'lucide-react';
 import "./css/contact.css";
+import AuthModal from "./AuthModal";
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -12,6 +14,17 @@ const Contact = () => {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -40,6 +53,60 @@ const Contact = () => {
 
   return (
     <div className="contact-page">
+      {/* Navigation */}
+      <nav className={`navbar ${scrolled ? 'scrolled' : ''}`}>
+        <div className="nav-container">
+          <div className="nav-content">
+            <div className="logo">
+              <div className="logo-icon">
+                <span>SB</span>
+              </div>
+              <span className="logo-text">Startup Bridge</span>
+            </div>
+            
+            <div className="nav-links desktop-nav">
+              <a href="/">Home</a>
+              <a href="/features">Features</a>
+              <a href="/about">About</a>
+              <a href="/Services">Services</a>
+              <a href="/Contact" className="active">Contact</a>
+              <button className="cta-button" onClick={() => setIsAuthOpen(true)}>
+                Get Started
+              </button>
+            </div>
+
+            <button 
+              className="mobile-menu-btn"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Menu */}
+        {isMenuOpen && (
+          <div className="mobile-menu">
+            <div className="mobile-menu-content">
+              <a href="/" onClick={() => setIsMenuOpen(false)}>Home</a>
+              <a href="/features" onClick={() => setIsMenuOpen(false)}>Features</a>
+              <a href="/about" onClick={() => setIsMenuOpen(false)}>About</a>
+              <a href="/Services" onClick={() => setIsMenuOpen(false)}>Services</a>
+              <a href="/Contact" className="active" onClick={() => setIsMenuOpen(false)}>Contact</a>
+              <button 
+                className="cta-button mobile-cta"
+                onClick={() => {
+                  setIsAuthOpen(true);
+                  setIsMenuOpen(false);
+                }}
+              >
+                Get Started
+              </button>
+            </div>
+          </div>
+        )}
+      </nav>
+
       <div className="contact-container">
         <header className="contact-header">
           <h1>
@@ -221,6 +288,40 @@ const Contact = () => {
           </button>
         </form>
       </div>
+
+      {/* Footer */}
+      <footer className="footer">
+        <div className="container">
+          <div className="footer-content">
+            <div className="footer-logo">
+              <div className="logo-icon">
+                <span>SB</span>
+              </div>
+              <span className="logo-text">Startup Bridge</span>
+            </div>
+            
+            <div className="footer-links">
+              <a href="/about">About</a>
+              <a href="/features">Features</a>
+              <a href="/Services">Services</a>
+              <a href="/Contact">Contact</a>
+            </div>
+            
+            <div className="social-icons">
+              <div className="social-icon">in</div>
+              <div className="social-icon">YT</div>
+              <div className="social-icon">X</div>
+            </div>
+          </div>
+          
+          <div className="footer-bottom">
+            <p className="footer-tagline">Startup Bridge – Skip the Guesswork, Build Smarter.</p>
+          </div>
+        </div>
+      </footer>
+
+      {/* Auth Modal */}
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </div>
   );
 };

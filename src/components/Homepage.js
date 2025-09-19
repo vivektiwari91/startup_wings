@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Star, Menu, X, ArrowRight, Target, Users, Lightbulb, TrendingUp } from 'lucide-react';
 import img1 from './img/start-up-business-goals-strategy.jpg';
+import img2 from './img/Gemini_Generated_Image_ts0co3ts0co3ts0c.png';
+import AuthModal from './AuthModal';
 
 const Homepage = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [problemSolutionVisible, setProblemSolutionVisible] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
   
   const problemSolutionRef = useRef(null);
 
@@ -46,7 +49,11 @@ const Homepage = () => {
           <div className="nav-content">
             <div className="logo">
               <div className="logo-icon">
-                <span>SB</span>
+              <img
+              src={img2}
+              alt="Startup Bridge Logo"
+              className="navbar-logo"
+              />
               </div>
               <span className="logo-text">Startup Bridge</span>
             </div>
@@ -57,7 +64,9 @@ const Homepage = () => {
               <a href="/about">About</a>
               <a href="/Services">Services</a>
               <a href="/Contact">Contact</a>
-              <button className="cta-button">Get Started</button>
+              <button className="cta-button" onClick={() => setIsAuthOpen(true)}>
+                Get Started
+              </button>
             </div>
 
             <button 
@@ -78,7 +87,15 @@ const Homepage = () => {
               <a href="/about" onClick={() => setIsMenuOpen(false)}>About</a>
               <a href="/Services" onClick={() => setIsMenuOpen(false)}>Services</a>
               <a href="/ContactUs" onClick={() => setIsMenuOpen(false)}>Contact Us</a>
-              <button className="cta-button mobile-cta">Get Started</button>
+              <button 
+                className="cta-button mobile-cta"
+                onClick={() => {
+                  setIsAuthOpen(true);
+                  setIsMenuOpen(false);
+                }}
+              >
+                Get Started
+              </button>
             </div>
           </div>
         )}
@@ -97,7 +114,7 @@ const Homepage = () => {
               <p className="hero-subtitle">
                 The guided platform that helps founders validate ideas, research markets, and launch with confidence.
               </p>
-              <button className="hero-cta">
+              <button className="hero-cta" onClick={() => setIsAuthOpen(true)}>
                 Start Validating Your Idea
                 <ArrowRight className="arrow-icon" size={20} />
               </button>
@@ -279,6 +296,9 @@ const Homepage = () => {
           </div>
         </div>
       </footer>
+
+      {/* Auth Modal */}
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </div>
   );
 };

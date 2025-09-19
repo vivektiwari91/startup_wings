@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, Users, Target, TrendingUp, Shield, Zap, Menu, X } from 'lucide-react';
 import './css/features.css'
+import AuthModal from './AuthModal';
+
 const Features = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -33,7 +36,9 @@ const Features = () => {
               <a href="/about">About</a>
               <a href="/Services">Services</a>
               <a href="/Contact">Contact</a>
-              <button className="cta-button">Get Started</button>
+              <button className="cta-button" onClick={() => setIsAuthOpen(true)}>
+                Get Started
+              </button>
             </div>
 
             <button 
@@ -53,7 +58,15 @@ const Features = () => {
               <a href="/about">About</a>
               <a href="/Services">Services</a>
               <a href="/Contact">Contact</a>
-              <button className="cta-button mobile-cta">Get Started</button>
+              <button 
+                className="cta-button mobile-cta"
+                onClick={() => {
+                  setIsAuthOpen(true);
+                  setIsMenuOpen(false);
+                }}
+              >
+                Get Started
+              </button>
             </div>
           </div>
         )}
@@ -135,6 +148,9 @@ const Features = () => {
           </div>
         </div>
       </footer>
+
+      {/* Auth Modal */}
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </div>
   );
 };
