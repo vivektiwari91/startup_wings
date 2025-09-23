@@ -1,225 +1,69 @@
 const Contact = require('../models/contact');
 
-// @desc    Create new contact message
-// @route   POST /api/contact
-// @access  Public
-const createContact = async (req, res) => {
+const submitContact = async (req, res) => {
   try {
-    const { name, email, phone, service, referral, message } = req.body;
+    const { name, email, phone, message, referral, service } = req.body;
 
-    // Validate required fields
-    if (!name || !email || !service || !message) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide all required fields: name, email, service, and message'
-      });
-    }
-
-    const contactData = {
+    // Create contact entry
+    const contact = new Contact({
       name: name.trim(),
-      email: email.toLowerCase().trim(),
-      phone: phone ? phone.trim() : '',
-      service: service.trim(),
+      email: email.toLowerCase(),
+      phone: phone?.trim() || '',
+      message: message.trim(),
       referral: referral || '',
-      message: message.trim()
-    };
+      service: service.trim(),
+      ipAddress: req.ip || req.connection.remoteAddress,
+      userAgent: req.get('User-Agent') || ''
+    });
 
-    // Add user ID if user is authenticated
-    if (req.user) {
-      contactData.createdBy = req.user.id;
-    }
+    await contact.save();
 
-    const contact = await Contact.create(contactData);
+    // Here you could add email notification logic
+    // await sendNotificationEmail(contact);
 
     res.status(201).json({
       success: true,
-      message: `Thanks ${name.split(' ')[0]}, we'll get back to you soon!`,
-      data: {
-        contact: {
-          id: contact._id,
-          name: contact.name,
-          email: contact.email,
-          service: contact.service,
-          status: contact.status,
-          createdAt: contact.createdAt
-        }
-      }
+      message: `Thanks ${name}, we'll get back to you soon!`,
+      contactId: contact._id
     });
   } catch (error) {
-    console.error('Create contact error:', error);
-    
-    // Handle validation errors
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({
-        success: false,
-        message: 'Validation error',
-        errors
-      });
-    }
-
+    console.error('Contact submission error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error while creating contact. Please try again.',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: 'Failed to submit contact form',
+      message: error.message
     });
   }
 };
 
-// @desc    Get all contact messages
-// @route   GET /api/contact
-// @access  Private/Admin
-const getAllContacts = async (req, res) => {
+const getContacts = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const status = req.query.status;
+    const service = req.query.service;
+    const sortBy = req.query.sortBy || 'createdAt';
+    const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
+
+    // Build filter object
+    const filter = {};
+    if (status) filter.status = status;
+    if (service) filter.service = service;
+
+    // Calculate skip value
     const skip = (page - 1) * limit;
 
-    // Build query
-    let query = {};
-    if (status) {
-      query.status = status;
-    }
-
-    const contacts = await Contact.find(query)
-      .populate('createdBy', 'name email')
-      .sort({ createdAt: -1 })
+    // Get contacts with pagination
+    const contacts = await Contact.find(filter)
+      .sort({ [sortBy]: sortOrder })
       .skip(skip)
       .limit(limit);
 
-    const total = await Contact.countDocuments(query);
+    // Get total count for pagination
+    const totalContacts = await Contact.countDocuments(filter);
+    const totalPages = Math.ceil(totalContacts / limit);
 
-    res.json({
-      success: true,
-      data: {
-        contacts,
-        pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit)
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Get contacts error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching contacts',
-      error: error.message
-    });
-  }
-};
-
-// @desc    Get single contact message
-// @route   GET /api/contact/:id
-// @access  Private/Admin
-const getContact = async (req, res) => {
-  try {
-    const contact = await Contact.findById(req.params.id)
-      .populate('createdBy', 'name email');
-
-    if (!contact) {
-      return res.status(404).json({
-        success: false,
-        message: 'Contact message not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        contact
-      }
-    });
-  } catch (error) {
-    console.error('Get contact error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching contact',
-      error: error.message
-    });
-  }
-};
-
-// @desc    Update contact status
-// @route   PUT /api/contact/:id
-// @access  Private/Admin
-const updateContact = async (req, res) => {
-  try {
-    const { status } = req.body;
-
-    if (!['pending', 'read', 'replied', 'closed'].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid status value'
-      });
-    }
-
-    const contact = await Contact.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true, runValidators: true }
-    ).populate('createdBy', 'name email');
-
-    if (!contact) {
-      return res.status(404).json({
-        success: false,
-        message: 'Contact message not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Contact status updated successfully',
-      data: {
-        contact
-      }
-    });
-  } catch (error) {
-    console.error('Update contact error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while updating contact',
-      error: error.message
-    });
-  }
-};
-
-// @desc    Delete contact message
-// @route   DELETE /api/contact/:id
-// @access  Private/Admin
-const deleteContact = async (req, res) => {
-  try {
-    const contact = await Contact.findByIdAndDelete(req.params.id);
-
-    if (!contact) {
-      return res.status(404).json({
-        success: false,
-        message: 'Contact message not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Contact message deleted successfully'
-    });
-  } catch (error) {
-    console.error('Delete contact error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while deleting contact',
-      error: error.message
-    });
-  }
-};
-
-// @desc    Get contact statistics
-// @route   GET /api/contact/stats
-// @access  Private/Admin
-const getContactStats = async (req, res) => {
-  try {
+    // Get statistics
     const stats = await Contact.aggregate([
       {
         $group: {
@@ -229,30 +73,121 @@ const getContactStats = async (req, res) => {
       }
     ]);
 
-    const total = await Contact.countDocuments();
+    const statusStats = {
+      pending: 0,
+      inProgress: 0,
+      resolved: 0,
+      closed: 0
+    };
+
+    stats.forEach(stat => {
+      statusStats[stat._id] = stat.count;
+    });
 
     res.json({
       success: true,
       data: {
-        stats,
-        total
+        contacts,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalContacts,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1
+        },
+        statistics: statusStats
       }
     });
   } catch (error) {
-    console.error('Get contact stats error:', error);
+    console.error('Get contacts error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error while fetching contact stats',
-      error: error.message
+      error: 'Failed to fetch contacts',
+      message: error.message
+    });
+  }
+};
+
+const getContactById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const contact = await Contact.findById(id);
+    
+    if (!contact) {
+      return res.status(404).json({
+        success: false,
+        error: 'Contact not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: contact
+    });
+  } catch (error) {
+    console.error('Get contact by ID error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch contact',
+      message: error.message
+    });
+  }
+};
+
+const updateContactStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, notes } = req.body;
+
+    const validStatuses = ['pending', 'inProgress', 'resolved', 'closed'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid status value'
+      });
+    }
+
+    const updateData = { 
+      status,
+      updatedAt: new Date()
+    };
+
+    if (notes) {
+      updateData.adminNotes = notes.trim();
+    }
+
+    const contact = await Contact.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!contact) {
+      return res.status(404).json({
+        success: false,
+        error: 'Contact not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Contact status updated successfully',
+      data: contact
+    });
+  } catch (error) {
+    console.error('Update contact status error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update contact status',
+      message: error.message
     });
   }
 };
 
 module.exports = {
-  createContact,
-  getAllContacts,
-  getContact,
-  updateContact,
-  deleteContact,
-  getContactStats
+  submitContact,
+  getContacts,
+  getContactById,
+  updateContactStatus
 };

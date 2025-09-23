@@ -1,24 +1,16 @@
 const express = require('express');
-const {
-  createContact,
-  getAllContacts,
-  getContact,
-  updateContact,
-  deleteContact,
-  getContactStats
-} = require('../controllers/contact');
-const { protect, authorize } = require('../middlewares/authmiddlewares');
+const { submitContact, getContacts, getContactById, updateContactStatus } = require('../controllers/contact');
+const { verifyToken, isAdmin } = require('../middlewares/authmiddlewares');
+const { validateContact } = require('../middlewares/contactmiddlewares');
 
 const router = express.Router();
 
-// Public routes - Allow both authenticated and anonymous users
-router.post('/', createContact);
+// Public route - submit contact form
+router.post('/submit', validateContact, submitContact);
 
-// Protected routes (Admin only)
-router.get('/', protect, authorize('admin'), getAllContacts);
-router.get('/stats', protect, authorize('admin'), getContactStats);
-router.get('/:id', protect, authorize('admin'), getContact);
-router.put('/:id', protect, authorize('admin'), updateContact);
-router.delete('/:id', protect, authorize('admin'), deleteContact);
+// Protected routes - admin only
+router.get('/all', verifyToken, isAdmin, getContacts);
+router.get('/:id', verifyToken, isAdmin, getContactById);
+router.put('/:id/status', verifyToken, isAdmin, updateContactStatus);
 
 module.exports = router;

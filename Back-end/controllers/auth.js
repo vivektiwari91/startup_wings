@@ -1,254 +1,194 @@
+const bcrypt = require('bcryptjs');
 const User = require('../models/user');
 const { generateToken } = require('../utils/generateToken');
 
-// @desc    Register new user
-// @route   POST /api/auth/register
-// @access  Public
 const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
-
-    // Validate input
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide name, email, and password'
-      });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password must be at least 6 characters long'
-      });
-    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'User already exists with this email'
+        error: 'User already exists with this email'
       });
     }
 
+    // Hash password
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
     // Create user
-    const user = await User.create({
+    const user = new User({
       name: name.trim(),
-      email: email.toLowerCase().trim(),
-      password,
-      role: 'user'
+      email: email.toLowerCase(),
+      password: hashedPassword
     });
 
+    await user.save();
+
     // Generate token
-    const token = generateToken({ id: user._id });
+    const token = generateToken(user._id);
 
     res.status(201).json({
       success: true,
-      message: 'Account created successfully',
-      data: {
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          createdAt: user.createdAt
-        },
-        token
+      message: 'User registered successfully',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt
       }
     });
   } catch (error) {
     console.error('Register error:', error);
-    
-    // Handle validation errors
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({
-        success: false,
-        message: 'Validation error',
-        errors
-      });
-    }
-
     res.status(500).json({
       success: false,
-      message: 'Server error during registration. Please try again.',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: 'Registration failed',
+      message: error.message
     });
   }
 };
 
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate input
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide email and password'
-      });
-    }
-
-    // Check for user and include password for comparison
+    // Find user
     const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
-    
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
-      });
-    }
-
-    // Check if user is active
-    if (!user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: 'Account is deactivated. Please contact support.'
+        error: 'Invalid email or password'
       });
     }
 
     // Check password
-    const isMatch = await user.comparePassword(password);
-    
-    if (!isMatch) {
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        error: 'Invalid email or password'
       });
     }
 
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save();
+
     // Generate token
-    const token = generateToken({ id: user._id });
+    const token = generateToken(user._id);
 
     res.json({
       success: true,
-      message: 'Welcome back!',
-      data: {
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role
-        },
-        token
+      message: 'Login successful',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        lastLogin: user.lastLogin
       }
     });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error during login. Please try again.',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: 'Login failed',
+      message: error.message
     });
   }
 };
 
-// @desc    Get current user
-// @route   GET /api/auth/me
-// @access  Private
-const getMe = async (req, res) => {
+const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
     res.json({
       success: true,
-      data: {
-        user
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt,
+        lastLogin: user.lastLogin
       }
     });
   } catch (error) {
-    console.error('Get me error:', error);
+    console.error('Get profile error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error',
-      error: error.message
+      error: 'Failed to fetch profile',
+      message: error.message
     });
   }
 };
 
-// @desc    Update user profile
-// @route   PUT /api/auth/profile
-// @access  Private
 const updateProfile = async (req, res) => {
   try {
     const { name, email } = req.body;
-    
-    const user = await User.findById(req.user.id);
-    
-    if (name) user.name = name;
+    const userId = req.user.id;
+
+    // Check if email is already taken by another user
     if (email) {
-      // Check if email is already taken by another user
-      const existingUser = await User.findOne({ email, _id: { $ne: req.user.id } });
+      const existingUser = await User.findOne({ 
+        email: email.toLowerCase(),
+        _id: { $ne: userId }
+      });
+      
       if (existingUser) {
         return res.status(400).json({
           success: false,
-          message: 'Email is already in use'
+          error: 'Email is already taken'
         });
       }
-      user.email = email;
     }
-    
-    await user.save();
-    
+
+    const updateData = {};
+    if (name) updateData.name = name.trim();
+    if (email) updateData.email = email.toLowerCase();
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
     res.json({
       success: true,
       message: 'Profile updated successfully',
-      data: {
-        user
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
       }
     });
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error',
-      error: error.message
-    });
-  }
-};
-
-// @desc    Change password
-// @route   PUT /api/auth/change-password
-// @access  Private
-const changePassword = async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-    
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide current and new password'
-      });
-    }
-    
-    const user = await User.findById(req.user.id).select('+password');
-    
-    // Check current password
-    const isMatch = await user.comparePassword(currentPassword);
-    if (!isMatch) {
-      return res.status(400).json({
-        success: false,
-        message: 'Current password is incorrect'
-      });
-    }
-    
-    user.password = newPassword;
-    await user.save();
-    
-    res.json({
-      success: true,
-      message: 'Password changed successfully'
-    });
-  } catch (error) {
-    console.error('Change password error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
+      error: 'Failed to update profile',
+      message: error.message
     });
   }
 };
@@ -256,7 +196,6 @@ const changePassword = async (req, res) => {
 module.exports = {
   register,
   login,
-  getMe,
-  updateProfile,
-  changePassword
+  getProfile,
+  updateProfile
 };
