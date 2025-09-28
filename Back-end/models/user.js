@@ -37,28 +37,14 @@ const userSchema = new mongoose.Schema({
   lastLogin: {
     type: Date,
     default: null
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
   }
 }, {
-  timestamps: true
+  timestamps: true // This automatically adds createdAt and updatedAt
 });
 
 // Index for faster queries
-userSchema.index({ email: 1 });
+// userSchema.index({ email: 1 }); // REMOVE THIS - unique: true already creates the index
 userSchema.index({ createdAt: -1 });
-
-// Update the updatedAt field before saving
-userSchema.pre('save', function(next) {
-  this.updatedAt = new Date();
-  next();
-});
 
 // Remove password from JSON output
 userSchema.methods.toJSON = function() {
